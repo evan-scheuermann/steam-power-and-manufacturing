@@ -64,9 +64,9 @@ different industries.
 ### Key Findings
 
 - Holding all else constant, steam-powered firms produced approximately **46%
-  more** than non-steam counterparts, making steam the strongest predictor
+  more** than non-steam counterparts
 - A 1% increase in capital investment corresponded to a 0.574 increase in
-  production value
+  production value, making capital the strongest predictor
 - Steam had a significant interaction effect with **half of the included
   industries**, with particularly strong effects in textiles, construction,
   and iron/steel
