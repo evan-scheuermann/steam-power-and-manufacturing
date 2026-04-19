@@ -1,0 +1,270 @@
+---
+title: "ECON314 Group Project"
+author: "Evan Scheuermann, Molly DeLeo, Jack Higman"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Part 1
+
+## Group Charter
+
+### Members and Roles
+
+Our group has three members: Evan Scheuermann, Molly DeLeo, and Jack Higman. Although we will collaborate and check in with each other for all aspects of the project, we each will take on distinct roles to split up the work evenly. The current division of responsibility is as follows:
+
+* Evan–group lead and primary data analyst, will devise a plan for applying regression to the data to get meaningful results, do the bulk of the data cleaning and analysis in R, and data visualization.
+* Molly–content interpretation and writing lead, will focus on converting output in R into a readable and understandable deliverable for both the showcase presentation and the academic paper.
+* Jack–lead editor, will support other group members in content development both within R and in the deliverables. Will also do the bulk of review of the rough drafts of both the code and academic paper.
+
+These roles are not mutually exclusive nor are they deterministic, they serve as a rough outline of the division of labor and will be adjusted accordingly as the project progresses to ensure equal participation among all members of the group.
+
+### Plans for Communication
+
+All three group members have agreed upon virtual meeting methods to make scheduling easier. We are currently planning to meet once a week on Tuesdays at 5:00 pm, but will set up more meetings throughout the course of the project if need be. In addition, we have a group chat set up to communicate between meetings and will use Google Drive to share project materials.
+
+### Accountability
+
+In the case of a group member failing to attend meetings, becoming unresponsive, or missing deadlines, we will document the issue and send an email to Dr. Chang to report the incident. We will try to avoid any issues by holding each other accountable. If a member fails to complete their work to a reasonable standard of quality by the due date, it will result in a 20% deduction from their grade for that stage. Evidence must be provided when reporting an individual.
+
+## Research Plan
+
+### Research Question
+
+To what extent did the transition to steam power drive the rapid increase in manufacturing productivity during this period? In what ways did it change American manufacturing industries.
+
+### Regression Model Specification
+
+To fully analyze what we are seeking, we will employ the following regression model:
+$$log(production\_values) = \beta_0 + \beta_1 steam + \beta_2 log(capital) + \beta_3 state + \beta_4 industry + \beta_5 steam*industry + \mu$$
+We will also analyze how the change in *production_values* correlates with *prod_qty*. If we find that there is not an exceedingly strong correlation, it may be worth investigating further since this could indicate that the increase in productivity may have also correlated with an increase in inflation. If this is significant enough, we may choose to change the dependent variable in equation one to *prod_qty*, as it would display the effect of steam power on productivity more clearly (*prod_qty* may cause other issues due to differing units, though, so that will be assessed during initial data cleaning and planning).
+
+### Summary Statistics
+
+```{r, results='hide', message=FALSE, warning=FALSE, echo=FALSE}
+library(tidyverse)
+library(stargazer)
+library(ggplot2)
+library(sf)
+library(maps)
+library(broom)
+library(ggpattern)
+library(gtsummary)
+library(ggtext)
+library(kableExtra)
+```
+
+```{r, results='hide', message=FALSE, warning=FALSE, echo=FALSE}
+cmf_1850 <- read.csv("C:/Users/evans/OneDrive/Documents/St John Fisher Documents/Spring 2026/Econometrics/Group Project/Datasets/cmf_1850.csv")
+```
+
+```{r, results='hide', message=FALSE, warning=FALSE, echo=FALSE}
+vars <- c("state", "capital", "production_values1", "ind_broadest", "power_steam")
+
+cmf_1850_cln <- cmf_1850 %>%
+  select(!!!vars) %>%
+  mutate(
+    across(c("state", "ind_broadest"), as.factor),
+    across(c("capital", "production_values1", "power_steam"), as.numeric),
+    across(where(is.numeric), replace_na, 0),
+    ind_broadest = recode(ind_broadest, "barrels, furniture, and other wood products" = "wood products", "beverages and tobacco" = "beverages/tobacco", "clothing and textiles" = "clothing/textiles", "iron and steel products" = "iron/steel products", "machinery and carriages" = "machinery/carriages", "other consumer products" = "other consumer prods", "other metal products" = "other metal prods", "paper and printing" = "paper/printing")
+  )
+
+summary(cmf_1850_cln)
+```
+
+```{r, results='hide', message=FALSE, warning=FALSE, echo=FALSE}
+cmf_tot_cln <- cmf_1850_cln %>%
+  mutate(
+    capital = capital/1000,
+    production_values1 = production_values1/1000
+  ) %>%
+  rename(
+    prod_val = production_values1,
+    steam = power_steam,
+    industry = ind_broadest
+  )
+
+attr(cmf_tot_cln$capital, "label")    <- "thousands of dollars"
+attr(cmf_tot_cln$prod_val, "label")   <- "thousands of dollars"
+
+summary(cmf_tot_cln)
+```
+
+```{r, echo=FALSE}
+stargazer(cmf_tot_cln,
+          type = "text",
+          digits = 4)
+```
+
+Note: *capital*, *prod_qty*, and *prod_val* are all expressed in thousands of dollars.
+
+In addition to these variables, we also include two categorical variables, *state* and *industry*, which are summarized below.
+
+```{r, echo=FALSE}
+tbl_summary(cmf_tot_cln,
+            include = c("state", "industry")) %>%
+  as_kable_extra()
+```
+
+# Part 2
+
+## Multiple Regression Analysis
+
+We start by preparing the data for a multiple linear regression model. We will take the log of *capital* and *prod_val* since these variables are skewed. This also allows us to examine a more meaningful relationship. That is, the coefficients in our model will represent the percent change in *prod_val* as a result of an increase in the respective explanatory variable by one unit, holding all else constant (ceteris paribus). The model will also include the interaction effect between *steam* and *industry*, since steam power likely impacted certain industries more than others. Examining the interaction effect reveals the nature of these relationships relationships and whether they are significant. The results are shown in the table below.
+
+```{r, results='hide', message=FALSE, warning=FALSE, echo=FALSE}
+cmf_tot_cln2 <- cmf_tot_cln %>%
+  mutate(
+    lcapital      = ifelse(capital > 0,      log(capital),      0),
+    lprod_val     = ifelse(prod_val > 0,     log(prod_val),     0)
+  )
+
+prodval_reg   <- lm(lprod_val ~ steam*industry + lcapital + state, data = cmf_tot_cln2)
+
+summary(prodval_reg)
+```
+
+```{r, echo=FALSE}
+print(summary(prodval_reg),
+      digits = 2)
+```
+
+The summary table displays how almost every variable is significant at some threshold, with many of them, including *steam* and *lcapital*, being significant at the 0.1% level. In addition, we see that the model has an $R^2$ value of approximately 0.59, indicating that the independent variables explain 59% of the total variation in *prod_val*, which is a fairly strong result. The plots below display the significance of the *industry* and *steam* interaction effect and of the *state* coefficients, respectively.
+
+```{r, echo=FALSE}
+sig_int <- c("beverages/tobacco", "clothing/textiles", "construction", "iron/steel products", "lumber", "not mfg", "other consumer prods")
+
+ggplot(cmf_tot_cln2, aes(x = industry, y = prod_val, fill = factor(steam))) +
+  geom_bar(stat = "summary", fun = "mean", position = "dodge") +
+  scale_x_discrete(labels = function(x) ifelse(x %in% sig_int,
+                                               paste0("**", x, "**"),
+                                               x)) +
+  labs(title = "Mean Production Value by Industsry",
+       subtitle = "Average Production Value by Industry for Firms Using Steam Power vs. Other",
+       caption = "Reference industry: wood products. Industries marked with bold label have interaction effect that is significant at the 5% level",
+       x = "Industry",
+       y = "Production Value\n(Thousands of Dollars)",
+       fill = "Power Type") +
+  scale_fill_manual(labels = c("Other", "Steam"),
+                      values = c("firebrick4", "dodgerblue4")) +
+  theme(plot.title = element_text(face = "bold", size = 13),
+        plot.subtitle = element_text(color = "gray40", size = 9),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(color = "gray50", size = 8),
+        legend.text = element_text(size = 9),
+        axis.text.x = ggtext::element_markdown(angle = 45, vjust = 1, hjust = 1,
+                                               color = "gray10", size = 8),
+        plot.caption = element_text(color = "gray50", size = 8, hjust = .4))
+```
+
+We see that half of the classified industries have a significant interaction effect with steam, and that the average production value per firm in each of these industries is much higher for those utilizing steam power. This corroborates the idea that steam power played a huge role in the industrial boom around 1850, especially in industries like textiles and construction.
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+state_coefs <- tidy(prodval_reg, conf.int = TRUE) %>%
+  filter(str_detect(term, "^state")) %>%
+  mutate(
+    state_name = str_remove(term, "^state"),
+    significant = p.value < .05
+  ) %>%
+  select(state_name, estimate, p.value, conf.low, conf.high, significant)
+
+baseline <- tibble(
+  state_name = "AL",
+  estimate = 0,
+  p.value = NA_real_,
+  conf.low = NA_real_,
+  conf.high = NA_real_,
+  significant = NA
+)
+
+state_lookup <- tibble(
+  state_abb = state.abb,
+  state_name = state.name
+)
+
+state_coefs <- state_coefs %>%
+  left_join(state_lookup, by = c("state_name" = "state_abb")) %>%
+  mutate(state_name = state_name.y) %>%
+  select(-state_name.y)
+
+state_coefs <- bind_rows(state_coefs, baseline)
+
+us_states_sf <- st_as_sf(map("state", plot = FALSE, fill = TRUE)) %>%
+  rename(state_name_lower = ID) %>%
+  mutate(state_name = str_to_title(state_name_lower))
+
+states_1850 <- c(
+  "Alabama", "Arizona", "California", "Connecticut", "District of Colombia", "Deleware", "Florida", "Iowa", "Illinois", "Indiana", "Kentucky", "Massachusetts", "Maryland", "Maine", "Michigan", "Minnesota", "Missouri", "Mississippi", "North Carolina", "New Hampshire", "New Jersey", "New York", "Ohio", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "Tenessee", "Texas", "Virginia", "Vermont", "Washington", "Wisconsin"
+)
+
+map_data <- us_states_sf %>%
+  left_join(state_coefs, by = "state_name") %>%
+  mutate(
+    is_baseline = state_name == "Alabama"
+  )
+
+sf_use_s2(FALSE)
+country_outline <- us_states_sf %>%
+  st_buffer(0) %>%
+  st_union()
+sf_use_s2(TRUE)
+
+ggplot(map_data) +
+  geom_sf(aes(fill = estimate), color = "gray70", linewidth = .3) +
+  geom_sf(
+    data = filter(map_data, is_baseline),
+    fill = "thistle", color = "white", linewidth = .3
+  ) +
+  geom_sf_pattern(
+    data = filter(map_data, significant == TRUE),
+    pattern = "stripe",
+    fill = NA,
+    color = NA,
+    pattern_colour = "gray30",
+    pattern_angle = 45,
+    pattern_density = .01,
+    pattern_spacing = .02
+  ) +
+  geom_sf(
+    data = filter(map_data, significant == TRUE),
+    fill = NA, color = "gray30", linewidth = .4
+  ) +
+  geom_sf(
+    data = country_outline,
+    fill = NA, color = "gray20", linewidth = .6
+  ) +
+  scale_fill_gradient2(
+    low = "dodgerblue4",
+    mid = "gray85",
+    high = "firebrick4",
+    midpoint = 0,
+    na.value = "white",
+    name = "Coefficient\nvs. Baseline"
+  ) +
+  coord_sf(crs = 5070) +
+  labs(
+    title = "US Heatmap for Production Value",
+    subtitle = "State Coefficients and Significance",
+    caption = "Reference State: Alabama (Light Pink). Stripes = p < 0.05. White = Not part of data"
+  ) +
+  theme_void(base_size = 11) +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(color = "gray40", size = 9),
+    plot.caption = element_text(color = "gray50", size = 8, hjust = .5)
+  )
+```
+
+This plot displays the impact that individual states had in predicting *prod_val*. We see that west coast states have very high coefficients compared to the others, all three of which are significant at the 5% threshold. Considering the historical context, this makes perfect sense. The California Gold Rush occurred at the same time as this data, so these large coefficients likely represent the explosive impact that it had on these states economies.
+
+
+
+
+
+
