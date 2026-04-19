@@ -21,10 +21,13 @@ did its effect vary across regions and industries?
 
 ## Data
 
-- **Source:** Hornbeck, R., Hsu, S. H.-M., Humlum, A., & Rotemberg, M. (2025).
+- **Source:** Historical Census of Manufactures Microdata — [cmfdata.org](https://cmfdata.org)
+- **Citation:** Hornbeck, R., Hsu, S. H.-M., Humlum, A., & Rotemberg, M. (2025).
   Gaining steam: Technology diffusion with recurring lock-in.
-  Historical Census of Manufactures Microdata. https://cmfdata.org
-- **Size:** 124,860 firms across 33 states and 15 industries
+- **Size:** 124,860 firms across 33 states and 15 industries (1850)
+- **Setup:** Download the 1850 dataset directly from
+  [cmfdata.org/get-data](https://cmfdata.org/get-data) and place it in a
+  `data/` folder in the project root before running the analysis.
 - **Key variables:**
   - `prod_val` — total annual value of goods produced (thousands of dollars)
   - `steam` — dummy variable indicating steam power use (6.8% of firms)
