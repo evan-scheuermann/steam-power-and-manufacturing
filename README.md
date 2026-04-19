@@ -41,7 +41,7 @@ did its effect vary across regions and industries?
 
 ## Model
 
-$$\log(\text{prod\_val}) = \beta_0 + \beta_1(\text{steam}) + \beta_2\log(\text{capital}) + \beta_3(\text{state}) + \beta_4(\text{industry}) + \beta_5(\text{steam} \times \text{industry}) + \mu$$
+$$\log(prod\underline{ }val) = \beta_0 + \beta_1(steam) + \beta_2\log(capital) + \beta_3(state) + \beta_4(industry) + \beta_5(steam \times industry) + \mu$$
 
 State and industry fixed effects are included to isolate the effect of steam 
 power from confounding geographic and sectoral factors. The steam × industry 
@@ -52,8 +52,8 @@ different industries.
 
 | Variable         | Estimate | Std. Error | Significance |
 |------------------|----------|------------|--------------|
-| steam            | 0.452    | (0.043)    | ***          |
-| log(capital)     | 0.574    | (0.002)    | ***          |
+| steam            | 0.452    | (0.043)    | < 0.1%          |
+| log(capital)     | 0.574    | (0.002)    | < 0.1%          |
 | state FEs        | —        | —          | Some sig. at 5% |
 | industry FEs     | —        | —          | All sig. at 5%  |
 | steam × industry | —        | —          | Some sig. at 5% |
