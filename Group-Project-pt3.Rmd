@@ -1,0 +1,404 @@
+---
+title: "Steam Power in Manufacturing and Industrial Growth in 1850"
+author: "Evan Scheuermann, Molly DeLeo, Jack Higman"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+header-includes:
+  - \usepackage{longtable}
+  - \usepackage{booktabs}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, results='hide', message=FALSE, warning=FALSE, echo=FALSE}
+library(tidyverse)
+library(stargazer)
+library(ggplot2)
+library(sf)
+library(maps)
+library(broom)
+library(ggpattern)
+library(gtsummary)
+library(ggtext)
+library(kableExtra)
+library(jtools)
+library(patchwork)
+library(gtsummary)
+library(gt)
+library(gtExtras)
+
+cmf_1850 <- read.csv("C:/Users/evans/OneDrive/Documents/St John Fisher Documents/Spring 2026/Econometrics/Group Project/Datasets/cmf_1850.csv")
+
+vars <- c("state", "capital", "production_values1", "ind_broadest", "power_steam")
+
+cmf_1850_cln <- cmf_1850 %>%
+  select(!!!vars) %>%
+  mutate(
+    across(c("state", "ind_broadest"), as.factor),
+    across(c("capital", "production_values1", "power_steam"), as.numeric),
+    across(where(is.numeric), replace_na, 0),
+    ind_broadest = recode(ind_broadest, "barrels, furniture, and other wood products" = "wood products", "beverages and tobacco" = "beverages/tobacco", "clothing and textiles" = "clothing/textiles", "iron and steel products" = "iron/steel products", "machinery and carriages" = "machinery/carriages", "other consumer products" = "other consumer prods", "other metal products" = "other metal prods", "paper and printing" = "paper/printing")
+  )
+
+summary(cmf_1850_cln)
+
+cmf_tot_cln <- cmf_1850_cln %>%
+  mutate(
+    capital = capital/1000,
+    production_values1 = production_values1/1000
+  ) %>%
+  rename(
+    prod_val = production_values1,
+    steam = power_steam,
+    industry = ind_broadest
+  )
+
+attr(cmf_tot_cln$capital, "label")    <- "thousands of dollars"
+attr(cmf_tot_cln$prod_val, "label")   <- "thousands of dollars"
+
+summary(cmf_tot_cln)
+
+cmf_tot_cln2 <- cmf_tot_cln %>%
+  mutate(
+    lcapital      = ifelse(capital > 0,      log(capital),      0),
+    lprod_val     = ifelse(prod_val > 0,     log(prod_val),     0)
+  )
+
+prodval_reg   <- lm(lprod_val ~ steam*industry + lcapital + state, data = cmf_tot_cln2)
+
+summary(prodval_reg)
+```
+
+## Introduction
+
+### Historical Context
+
+In the mid-1800s, the United States was going through a major economic transformation. The economy was shifting away from being primarily agricultural and becoming increasingly dependent on manufacturing. This shift did not happen all at once, but one of the biggest drivers behind it was the introduction and spread of steam power. Unlike water-powered systems, which depend heavily on location and natural resources, steam engines gave manufacturers more flexibility. Factories could be built in more convenient locations and operate more consistently, which allowed firms to scale production in ways that were not previously possible.
+
+Because of this, steam power was one of the most important technological advancements of the early industrial period. It not only increased production capacity but also changed how industries were organized and how labor was used. However, even though steam power was important, it did not affect every firm, industry, or region in the same way. Certain industries and states were better suited to adopt this new technology, leading to a significantly greater boost in productive output, although it should be noted that some regions also experienced faster economic growth due to other factors happening at the same time (i.e. the California Gold Rush). 
+
+This paper focuses on the question: To what extent did steam power increase manufacturing productivity in 1850, and how did its impact differ across industries and states? This question is important because it helps connect technological change to actual economic outcomes. Instead of just knowing that steam power existed, we want to understand how much it actually mattered in terms of productive output. 
+
+### Connections with Other Literature
+
+Previous research supports the idea that technological change was a major driver of industrial growth. Atack, Bateman, and Margo find that mechanization and capital investment were key in increasing productivity in early American manufacturing. Their work shows that larger, more capital-intensive firms tended to be more productive, which suggests that access to resources played a big role alongside the development of new technology. Rosenberg also emphasizes that technological innovation does not spread evenly and that its impact depends on how easily it can be adopted, which varies among different industries. This is especially relevant for steam power since some production processes benefit more from mechanization than others. More recent work by Hornbeck looks at how new technologies spread geographically and how this diffusion affected regional economic outcomes. Their findings show that this process of diffusion can significantly influence how much of an impact a new technology has. 
+
+Our research builds on these ideas by using firm-level data from the 1850 Census of Manufacturers to directly measure the relationship between steam power and production. By including controls for capital investment, industry, location, and the interaction effect between steam power and industry, the analysis provides a better understanding of the role steam power played in productive growth during this period.
+
+## Data and Variables
+
+### Data Source
+
+The data set used in this analysis comes from the 1850 U.S. Census of Manufacturers, which provides detailed information about manufacturing firms across the country. The data set classifies firms into 15 major industry categories and covers 33 states, making it highly comprehensive for this time period. According to the project data set, there are 124,860 total observations, which allows for a very detailed analysis of firm-level behavior. 
+
+The data set also includes information relating to annual production value, total capital investment, and whether a firm used steam power. This level of detail makes it possible to analyze not just whether steam power mattered, but also how its effects varied across different industries and regions. 
+
+### Summary Statistics
+
+The variables used in this analysis are:
+
+* production value (response variable)
+* steam
+* capital
+* state
+* industry
+* steam$\times$industry
+
+Summary statistics for all numeric variables are shown in the table below.
+
+```{r, echo=FALSE}
+stargazer(cmf_tot_cln,
+          type = "text",
+          digits = 4)
+```
+
+Note: *capital*, *prod_qty*, and *prod_val* are all expressed in thousands of dollars.
+
+Production value has a mean of about 7.47 thousand dollars and a very large standard deviation of 47.11 thousand dollars. Capital has a mean of 4.40 thousand dollars with a standard deviation of 27.81 thousand dollars. These large standard deviations show that there is a wide spread in the data, meaning that some firms were producing significantly more than others. The variation in both production and capital highlights how inconsistent industrial development was at the time.
+
+One of the most interesting statistics is the steam variable, which has a mean of 0.0677. This means that only about 6.8% of firms used steam power in 1850, which is important because it shows that steam power was not yet widely adopted, even though it is often seen as a defining feature of industrialization. This also suggests that firms using steam may have had certain advantages, such as better access to capital or more advanced production methods.
+
+Aside from the numeric variables, our analysis also included two categorical variables, industry and state, which are summarized below.
+
+```{r, echo=FALSE}
+tbl1 <- tbl_summary(cmf_tot_cln,
+                    include = "state") %>%
+  as_gt()
+
+tbl2 <- tbl_summary(cmf_tot_cln,
+                    include = "industry") %>%
+  as_gt()
+
+gt_two_column_layout(list(tbl1, tbl2))
+```
+
+
+### Visualizations and Interpretation
+
+Numeric variables like production value and capital are often skewed, and thus it is important to take their log to get more accurate regression results. The distribution before and after this transformation are shown below.
+
+```{r, echo=FALSE, fig.width=7, fig.height=3.5}
+prodval_hist    <- ggplot(data = cmf_tot_cln2, aes(x = prod_val)) +
+  geom_histogram(binwidth = 3) +
+  labs(
+    title = "Production Value Histogram",
+    subtitle = "Plotted with $3,000 Bin Width",
+    x = "Production Value",
+    y = "Number of Observations"
+  ) +
+  coord_cartesian(xlim = c(0, 100))
+
+logprodval_hist <- ggplot(data = cmf_tot_cln2, aes(x = lprod_val)) +
+  geom_histogram(binwidth = .5) +
+  labs(
+    title = "Log Production Value Histogram",
+    subtitle = "Plotted with Bin Width of 0.5",
+    x = "Log Production Value",
+    y = ""
+  )
+
+(prodval_hist + logprodval_hist) +
+  plot_annotation(title = "Distribution of Production Value vs. Log Production Value")
+
+cap_hist    <- ggplot(data = cmf_tot_cln2, aes(x = capital)) +
+  geom_histogram(binwidth = 3) +
+  labs(
+    title = "Capital Histogram",
+    subtitle = "Plotted with $3,000 Bin Width",
+    x = "Capital",
+    y = "Number of Observations"
+  ) +
+  coord_cartesian(xlim = c(0, 100))
+
+logcap_hist <- ggplot(data = cmf_tot_cln2, aes(x = lcapital)) +
+  geom_histogram(binwidth = .5) +
+  labs(
+    title = "Log Capital Histogram",
+    subtitle = "Plotted with 1 Bin Width",
+    x = "Log Capital",
+    y = ""
+  )
+
+(cap_hist + logcap_hist) +
+  plot_annotation(title = "Distribution of Capital vs. Log Capital")
+```
+
+Both variables were substantially skewed right, but after taking the log we see that they are approximately normal. This is helpful because it ensures stable OLS estimators and reduces the effect of extreme outliers, which are clearly present in the data. Taking the log of these variables also gives us a different interpretation of coefficients, which is discussed further in the results section.
+
+## Regression model
+
+### Model Specification
+
+The regression model used in this analysis is:
+$$log(production\_values) = \beta_0 + \beta_1 steam + \beta_2 log(capital) + \beta_3 state + \beta_4 industry + \beta_5 steam \times industry + \mu$$
+
+This model allows us to estimate the effect of steam power on production value while also revealing other important relationships.
+
+### Variable Definitions
+
+The variables used in this analysis are defined as follows:
+
+* production value -- total annual value of goods produced by each firm (in thousands)
+* steam -- dummy variable indicating whether the firm used steam power
+* capital -- total value invested in the firm including real estate, equipment, etc. (in thousands)
+* state -- state where the firm's productive activities were primarily located
+* industry -- primary type of business (general categories)
+* steam$\times$industry -- interaction effect between steam and industry, which displays the effect steam power had on each individual industry
+
+The dependent variable, production value, is logged since the distribution of this variable is skewed. This means that all coefficients represent the percent change in production value, as opposed to a dollar amount. The key explanatory variable is steam, which equals one if a firm uses steam power and zero otherwise. Capital is also included in logged form to ensure a more normal distribution of this variable, which means it has an elastic relationship with production value.
+
+State and industry variables are included as categorical controls to capture differences across locations and sectors. The interaction between steam and industry is included to test whether the effect of steam power varies depending on the type of industry. 
+
+Including state and industry controls helps isolate the effect of steam power by accounting for other differences between firms. Without these controls, the results could be biased since certain regions and industries are generally more productive than others. The interaction term is especially important because it allows the model to determine which industries had a statistically significant boost in production due to steam, giving a more detailed picture of its impact on industrialization.
+
+## Main results
+
+### Regression Results
+
+```{r, echo=FALSE}
+stargazer(prodval_reg,
+          type="text",
+          no.space = TRUE,
+          single.row = TRUE)
+```
+
+### Interpreting the Results
+
+The regression results show that steam power has a coefficient of approximately 0.45, which is statistically significant at the 0.1% level. This means that, holding other factors constant, firms using steam power produce about $e^{0.45} - 1 \approx 57\%$ more output than those that do not. The positive and significant coefficient on steam confirms that steam power played a major role in increasing productivity. This aligns with historical expectations, since steam allowed firms to operate more efficiently and at a larger scale. 
+
+Capital has a coefficient of about 0.57. Since it is a log variable, this means that a 1% increase in capital predicts a 0.57% increase in production value. This is a fairly large effect and is significant at the 0.1% level, which suggests that access to resources was just as important as technological innovation. Firms that could invest more were able to take greater advantage of new technologies.
+
+The industry estimators show that some sectors were naturally more productive than others (relative to baseline industry, wood products). For example, industries like textiles and construction tend to have large positive coefficients, while others like lumber show large negative coefficients. Interestingly, every single industry coefficient was significant at the 5% level, and all but two were even significant at the 0.1% level, reinforcing the claim that production value significantly varies across industries. In addition, the interaction terms reveal that steam power did not benefit all industries equally. In some cases, the effect is stronger, while in others it is weaker or even slightly negative. This suggests that the usefulness of steam power depended on how well it fit into existing production processes. These relationships are shown in the plot below.
+
+```{r, echo=FALSE}
+sig_int <- c("beverages/tobacco", "clothing/textiles", "construction", "iron/steel products", "lumber", "not mfg", "other consumer prods")
+
+ggplot(cmf_tot_cln2, aes(x = industry, y = prod_val, fill = factor(steam))) +
+  geom_bar(stat = "summary", fun = "mean", position = "dodge") +
+  scale_x_discrete(labels = function(x) ifelse(x %in% sig_int,
+                                               paste0("**", x, "**"),
+                                               x)) +
+  labs(title = "Mean Production Value by Industry",
+       subtitle = "Average Production Value by Industry for Firms Using Steam Power vs. Other",
+       caption = "Reference industry: wood products. Industries marked with bold label have interaction effect that is significant at the 5% level",
+       x = "Industry",
+       y = "Production Value\n(Thousands of Dollars)",
+       fill = "Power Type") +
+  scale_fill_manual(labels = c("Other", "Steam"),
+                      values = c("firebrick4", "dodgerblue4")) +
+  theme(plot.title = element_text(face = "bold", size = 13),
+        plot.subtitle = element_text(color = "gray40", size = 9),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(color = "gray50", size = 8),
+        legend.text = element_text(size = 9),
+        axis.text.x = ggtext::element_markdown(angle = 45, vjust = 1, hjust = 1,
+                                               color = "gray10", size = 8),
+        plot.caption = element_text(color = "gray50", size = 8, hjust = .4))
+```
+
+This visualization compares average production value across industries for firms that used steam power versus those that did not. Across all industries, firms using steam power have higher production values. In some industries, the difference is especially large, which suggests that steam power had a stronger effect in those areas. This pattern supports the idea that steam power improved productivity by allowing firms to produce more output with the same or similar inputs. However, the size of the difference varies by industry, which indicates that the benefits of steam power were not uniform. 
+
+State-level effects also show large differences. The results are shown in the heat map below.
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE, fig.show='hide'}
+state_coefs <- tidy(prodval_reg, conf.int = TRUE) %>%
+  filter(str_detect(term, "^state")) %>%
+  mutate(
+    state_name = str_remove(term, "^state"),
+    significant = p.value < .05
+  ) %>%
+  select(state_name, estimate, p.value, conf.low, conf.high, significant)
+
+baseline <- tibble(
+  state_name = "AL",
+  estimate = 0,
+  p.value = NA_real_,
+  conf.low = NA_real_,
+  conf.high = NA_real_,
+  significant = NA
+)
+
+state_lookup <- tibble(
+  state_abb = state.abb,
+  state_name = state.name
+)
+
+state_coefs <- state_coefs %>%
+  left_join(state_lookup, by = c("state_name" = "state_abb")) %>%
+  mutate(state_name = state_name.y) %>%
+  select(-state_name.y)
+
+state_coefs <- bind_rows(state_coefs, baseline)
+
+us_states_sf <- st_as_sf(map("state", plot = FALSE, fill = TRUE)) %>%
+  rename(state_name_lower = ID) %>%
+  mutate(state_name = str_to_title(state_name_lower))
+
+states_1850 <- c(
+  "Alabama", "Arizona", "California", "Connecticut", "District of Colombia", "Deleware", "Florida", "Iowa", "Illinois", "Indiana", "Kentucky", "Massachusetts", "Maryland", "Maine", "Michigan", "Minnesota", "Missouri", "Mississippi", "North Carolina", "New Hampshire", "New Jersey", "New York", "Ohio", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "Tenessee", "Texas", "Virginia", "Vermont", "Washington", "Wisconsin"
+)
+
+map_data <- us_states_sf %>%
+  left_join(state_coefs, by = "state_name") %>%
+  mutate(
+    is_baseline = state_name == "Alabama"
+  )
+
+sf_use_s2(FALSE)
+country_outline <- us_states_sf %>%
+  st_buffer(0) %>%
+  st_union()
+sf_use_s2(TRUE)
+
+heatmap <- ggplot(map_data) +
+  geom_sf(aes(fill = estimate), color = "gray70", linewidth = .3) +
+  geom_sf(
+    data = filter(map_data, is_baseline),
+    fill = "thistle", color = "white", linewidth = .3
+  ) +
+  geom_sf_pattern(
+    data = filter(map_data, significant == TRUE),
+    pattern = "stripe",
+    fill = NA,
+    color = NA,
+    pattern_colour = "gray30",
+    pattern_angle = 45,
+    pattern_density = .01,
+    pattern_spacing = .02
+  ) +
+  geom_sf(
+    data = filter(map_data, significant == TRUE),
+    fill = NA, color = "gray30", linewidth = .4
+  ) +
+  geom_sf(
+    data = country_outline,
+    fill = NA, color = "gray20", linewidth = .6
+  ) +
+  scale_fill_gradient2(
+    low = "dodgerblue4",
+    mid = "gray85",
+    high = "firebrick4",
+    midpoint = 0,
+    na.value = "white",
+    name = "Coefficient\nvs. Baseline"
+  ) +
+  coord_sf(crs = 5070) +
+  labs(
+    title = "US Heatmap for Production Value",
+    subtitle = "State Coefficients and Significance",
+    caption = "Reference State: Alabama (Light Pink). Stripes = p < 0.05. White = Not part of data"
+  ) +
+  theme_void(base_size = 11) +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(face = "bold", size = 18),
+    plot.subtitle = element_text(color = "gray40", size = 12),
+    plot.caption = element_text(color = "gray50", size = 10, hjust = .5)
+  )
+
+ggsave("us_heatmap.png", plot = heatmap, width = 10, height = 6, dpi = 150)
+```
+
+```{r, echo=FALSE, out.width="100%", fig.align="center"}
+knitr::include_graphics("C:/Users/evans/OneDrive/Documents/St John Fisher Documents/Spring 2026/Econometrics/Group Project/us_heatmap.png")
+```
+
+We see that western states, especially California, show significantly higher coefficients compared to others. This likely reflects the economic impact of the California Gold Rush, which increased demand for goods and services and boosted production levels.
+
+Together, these visualizations show that both technology and location played important roles in shaping manufacturing outcomes.
+
+## Conclusion
+
+### Answering the Research Question
+
+The results show that steam power had a significant and meaningful impact on manufacturing productivity in 1850. Firms that used steam power produced about 45% more output on average, which indicates that it was an important driver of industrial growth. The impact of steam power varied significantly across industries, displaying a key detail in the role of this technology during industrialization. Capital investment was another key factor in predicting annual production, which reveals that having access to financial resources was arguably just as important as steam itself.
+
+### Limitations
+
+There are a few limitations to this study. First, the data may contain measurement errors or inconsistencies, since it comes from historical records. Second, there are likely other important variables, such as labor quality or access to transportation, that are not included in the model. 
+
+Another limitation is that the analysis shows correlation rather than causation. It is possible that more productive firms were able to adopt steam power more easily, rather than steam power causing the increase in productivity. Finally, industry classifications are somewhat broad, which may reduce the precision of the results.
+
+### Final Takeaway
+
+Overall, steam power was a major contributor to industrial growth, but it worked alongside other important factors like capital investment and regional economic conditions. This shows that technological change alone is not enough to drive economic growth – it needs to be supported by resources and the right environment. 
+
+## References
+
+Atack, J. Bateman, F., & Margo, R. (2008). Steam power, establishment size, and labor productivity growth in nineteenth century American manufacturing. 
+
+Hornbeck, R., Hsu, S. H.-M., Holme, A., & Rotemberg, M. (2025). Gaining steam: Technology diffusion with recurring lock-in. 
+
+Rosenberg, N. (1972). Factors affecting the diffusion of technology. 
+
+U.S. Census Bureau. (1850). Census of Manufacturers.
+
+## AI Disclosure
+
+Claude Sonnet 4.6 -- Used to troubleshoot rendering issues when knitting the .rmd file to a .pdf and for reviewing the .pdf for errors after completing the write-up. No content was generated by AI, the work is completely original to the authors of this project.
+
+All AI output was thoroughly reviewed before being taken into consideration or implemented into the project. The authors of this project assume full responsibility for the accuracy and proper use of all AI use regarding this project. More details can be provided upon request.
