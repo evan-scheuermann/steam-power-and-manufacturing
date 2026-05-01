@@ -3,9 +3,6 @@
 **ECON 314 | St. John Fisher University**  
 Evan Scheuermann, Jack Higman, Molly DeLeo
 
-> **Status:** In progress — formal academic write-up forthcoming. 
-> Regression analysis and visualizations complete.
-
 ## Overview
 
 During the mid-19th century, the U.S. was transitioning from an agricultural 
@@ -106,9 +103,9 @@ Hatching indicates significance at the 5% level. White = not in dataset.
 
 - Evan Scheuermann — research question design, data cleaning, regression
   modeling, state fixed effects, choropleth and industry visualizations,
-  poster design
-- Jack Higman
-- Molly DeLeo
+  poster design, write-up contributions and editing
+- Jack Higman — supporting contributions
+- Molly DeLeo — supporting contributions
 
 ## Reference
 
